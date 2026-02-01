@@ -1,35 +1,27 @@
-package spp;
+package spp.core;
+
+import spp.types.CommandType;
+import spp.types.SequenceFlags;
 
 /*
-Packet Primary Header
-
-* Packet version number
-* Packet identification
-  ** packet type
-  ** secondary header flag
-  ** application process identifier
-* Packet Sequence Control
-  ** sequenceFlags
-  ** packet sequence count / packet name
-* Packet data length
+SpacePacket Header
+  * Packet version number
+  * Packet identification
+    ** packet type
+    ** secondary header flag
+    ** application process identifier
+  * Packet Sequence Control
+    ** sequenceFlags
+    ** packet sequence count / packet name
+  * Packet data length
  */
 public class SpacePacketHeader {
 
   // Packet Version Number
   private static final int CCSDS_VERSION_NUMBER_000 = 0;
 
-  // Packet Type
-  private static final int TYPE_TM = 0;
-  private static final int TYPE_TC = 1;
-
   // APID (Idle Packet)
   private static final int APID_IDLE_PACKET_11111111111 = 2047;
-
-  // Sequence Flags
-  private static final int CONTINUATION_SEGMENT_FLAG = 0;
-  private static final int FIRST_SEGMENT_FLAG = 1;
-  private static final int LAST_SEGMENT_FLAG = 2;
-  private static final int UNSEGMENTED_FLAG = 3;
 
   // Sequence Count
   private static final int PACKET_SEQUENCE_COUNT_MIN = 0;
@@ -42,18 +34,18 @@ public class SpacePacketHeader {
   private int packetVersionNumber;
 
   // packet identification
-  private int packetType;
+  private CommandType packetType;
   private boolean secondaryHeaderFlag;
   private int apid;
 
   // packet sequence control
-  private int sequenceFlags;
+  private SequenceFlags sequenceFlags;
   private int packetSequenceCount;
 
   // packet length
   private int packetDataLength;
 
-  public SpacePacketHeader(int packetVersionNumber, int packetType, boolean secondaryHeaderFlag,  int apid, int sequenceFlags, int packetSequenceCount, int packetDataLength) {
+  public SpacePacketHeader(int packetVersionNumber, CommandType packetType, boolean secondaryHeaderFlag,  int apid, SequenceFlags sequenceFlags, int packetSequenceCount, int packetDataLength) {
     this.packetVersionNumber = packetVersionNumber;
     this.packetType = packetType;
     this.secondaryHeaderFlag = secondaryHeaderFlag;
@@ -71,8 +63,8 @@ public class SpacePacketHeader {
     }
 
     // Packet Type (0 - TM, 1 - TC)
-    if (packetType != TYPE_TM &&  packetType != TYPE_TC) {
-      throw new IllegalArgumentException("Packet type must be 0 for (TM) or 1 (TC)!");
+    if (packetType == null) {
+      throw new IllegalArgumentException("Packet type cannot be null!");
     }
 
     // Apid - 2047 (idle packet in decimal format - binary: 11111111111)
@@ -81,8 +73,8 @@ public class SpacePacketHeader {
     }
 
     // Sequence flags: 00, 01, 10, 11
-    if (sequenceFlags < CONTINUATION_SEGMENT_FLAG || sequenceFlags > UNSEGMENTED_FLAG) {
-      throw new IllegalArgumentException("Sequence flags must be between 0 and 3!");
+    if (sequenceFlags == null) {
+      throw new IllegalArgumentException("Sequence flags cannot be null!");
     }
 
     // Sequence count
@@ -111,7 +103,7 @@ public class SpacePacketHeader {
     this.packetVersionNumber = packetVersionNumber;
   }
 
-  public void setPacketType(int packetType) {
+  public void setPacketType(CommandType packetType) {
     this.packetType = packetType;
   }
 
@@ -123,7 +115,7 @@ public class SpacePacketHeader {
     this.apid = apid;
   }
 
-  public void setSequenceFlags(int sequenceFlags) {
+  public void setSequenceFlags(SequenceFlags sequenceFlags) {
     this.sequenceFlags = sequenceFlags;
   }
 
@@ -139,7 +131,7 @@ public class SpacePacketHeader {
     return packetVersionNumber;
   }
 
-  public int getPacketType() {
+  public CommandType getPacketType() {
     return packetType;
   }
 
@@ -151,7 +143,7 @@ public class SpacePacketHeader {
     return apid;
   }
 
-  public int getSequenceFlags() {
+  public SequenceFlags getSequenceFlags() {
     return sequenceFlags;
   }
 

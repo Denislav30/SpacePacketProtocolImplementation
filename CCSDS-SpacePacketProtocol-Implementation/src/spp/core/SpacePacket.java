@@ -1,5 +1,10 @@
-package spp;
+package spp.core;
 
+/*
+SpacePacket
+  * Packet Primary Header (SpacePacketHeader class)
+  * Packet Data Field (Packet Secondary Header + User Data Field)
+ */
 public class SpacePacket {
 
   private SpacePacketHeader header;
@@ -8,6 +13,18 @@ public class SpacePacket {
   public SpacePacket(SpacePacketHeader header, byte[] packetDataField) {
     this.header = header;
     this.packetDataField = packetDataField;
+  }
+
+  public void validateSpacePacket() {
+    if (header == null) {
+      throw new IllegalArgumentException("Header cannot be null!");
+    }
+
+    header.validateHeaderFields();
+
+    if (packetDataField == null) {
+      throw new IllegalArgumentException("Packet Data Field cannot be null!");
+    }
   }
 
   public SpacePacketHeader getHeader() {
