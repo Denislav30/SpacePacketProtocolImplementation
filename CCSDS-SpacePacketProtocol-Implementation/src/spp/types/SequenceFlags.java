@@ -23,7 +23,7 @@ public enum SequenceFlags {
     return value;
   }
 
-  public SequenceFlags getSequenceFlags(int value) {
+  public static SequenceFlags getSequenceFlags(int value) {
     switch (value) {
       case 0:
         return CONTINUATION;

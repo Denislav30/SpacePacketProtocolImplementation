@@ -15,7 +15,11 @@ public enum CommandType {
     this.value = value;
   }
 
-  public CommandType getCommandType(int value) {
+  public int getValue() {
+    return value;
+  }
+
+  public static CommandType getCommandType(int value) {
     switch (value) {
       case 0:
           return TM;
