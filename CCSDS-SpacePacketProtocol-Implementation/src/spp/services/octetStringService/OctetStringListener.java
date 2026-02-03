@@ -1,7 +1,9 @@
 package spp.services.octetStringService;
 
+/*
+  OctetStringListener class contains method indication which represents the primitive PACKET.indication
+ */
 @FunctionalInterface
 public interface OctetStringListener {
-  // OCTET_STRING.indication
   void indication(byte[] data);
 }

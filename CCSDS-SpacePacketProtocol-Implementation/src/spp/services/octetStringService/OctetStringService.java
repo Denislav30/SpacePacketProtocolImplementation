@@ -1,7 +1,9 @@
 package spp.services.octetStringService;
 
+/*
+  OctetStringService class contains method request which represents the primitive PACKET.request
+ */
 public interface OctetStringService {
-  // OCTET_STRING.request
   void request(byte[] data);
   void setListener(OctetStringListener octetStringListener);
 }
