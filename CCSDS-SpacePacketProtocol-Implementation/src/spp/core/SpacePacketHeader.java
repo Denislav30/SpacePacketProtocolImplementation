@@ -5,15 +5,24 @@ import spp.types.SequenceFlags;
 
 /*
 SpacePacket Header
-  * Packet version number
-  * Packet identification
-    ** packet type
-    ** secondary header flag
-    ** application process identifier
-  * Packet Sequence Control
-    ** sequenceFlags
-    ** packet sequence count / packet name
-  * Packet data length
+  * Packet version number (3 bits)
+  * Packet identification (13 bits)
+    ** packet type (1 bit)
+    ** secondary header flag (1 bit)
+    ** application process identifier (11 bits)
+  * Packet Sequence Control (16 bits)
+    ** sequenceFlags (2 bits)
+    ** packet sequence count / packet name (14 bits)
+  * Packet data length (16 bits)
+
+  Packet version number + Packet identification = 16 bits = 2 octets
+  Packet sequence control = 16 bits = 2 octets
+  Packet data length = 16 bits = 2 octets
+
+  Bits 0 - 2   Packet version number (3)
+  Bits 3 - 15  Packet identification (13) = Packet Type (1) + Secondary header flag (1) + APID (11)
+  Bits 16 - 31 Packet sequence control (16) = SequenceFlags (2) + Packet Sequence Count / Packet name (14)
+  Bits 32 - 47 Packet data length (16) = C = (Packet data field length in octets) - 1
  */
 public class SpacePacketHeader {
 
@@ -97,6 +106,90 @@ public class SpacePacketHeader {
       throw new IllegalArgumentException("packetDataFieldOctets must be at least 1 octet!");
     }
     return  packetDataFieldOctets - 1;
+  }
+
+  public byte[] convertToPacketPrimaryHeaderBytes() {
+    validateHeaderFields();
+
+    byte[] packetPrimaryHeader = new byte[6];
+
+    int packetIdentification = buildPacketIdentification();
+    int packetSequenceControl = buildPacketSequenceControl();
+    int c = buildPacketDataLength();
+
+    write16BitBigEndianFormat(packetPrimaryHeader, 0, packetIdentification);
+    write16BitBigEndianFormat(packetPrimaryHeader, 2, packetSequenceControl);
+    write16BitBigEndianFormat(packetPrimaryHeader, 4, c);
+
+    return packetPrimaryHeader;
+  }
+
+//  public SpacePacketHeader parsePacketPrimaryHeader(byte[] packetPrimaryHeader) {
+//    if (packetPrimaryHeader == null) {
+//      throw new IllegalArgumentException("Packet primary header cannot be null!");
+//    }
+//    if (packetPrimaryHeader.length != 6) {
+//      throw new IllegalArgumentException("Packet primary header length must be exactly 6 bytes!");
+//    }
+//
+//    int packetIdentification = read16BitBigEndianFormat(packetPrimaryHeader, 0);
+//    int packetSequenceControl = read16BitBigEndianFormat(packetPrimaryHeader, 2);
+//    int c = read16BitBigEndianFormat(packetPrimaryHeader, 4);
+//
+//    // temporary header
+//    SpacePacketHeader temporaryHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 0);
+//
+//
+//  }
+
+  private int buildPacketIdentification() {
+    // (3 bits) => 2^3 - 1 MAX
+    int packetVersionNumber = this.packetVersionNumber & 7;
+
+    // (1 bit) => 2^1 - 1 = 1
+    int packetType = this.packetType.getValue() & 1;
+
+    // (1 bit)
+    int secondaryHeaderFlag = (this.secondaryHeaderFlag ? 1 : 0) & 1;
+
+    // (11 bits) => 2^11 - 1 = 2047
+    int apid = this.apid & 2047;
+
+    // packetVersionNumber is before (packetType(1) + secondary header flag(1) + application process identifier(11)) => packetVersionNumber << 13
+    // packetType is before (secondaryHeaderFlag(1) + application process identifier(11)) => packetType << 12
+    // secondaryHeaderFlag is before (apid(11)) => secondaryHeaderFlag << 11
+    // apid should not be moved
+    return (packetVersionNumber << 13) | (packetType << 12) | (secondaryHeaderFlag << 11) | apid;
+  }
+
+  private int buildPacketSequenceControl() {
+    // (2 bits) => 2^2 - 1 = 3
+    int sequenceFlags = this.sequenceFlags.getValue() & 3;
+
+    // (14 bits) => 2^14 - 1 = 16383
+    int packetSequenceCountOrPacketName = this.packetSequenceCount & 16383;
+
+    // sequence flags is before (packetSequenceCountOrPacketName(14)) => packetSequenceCountOrPacketName << 14
+    return (sequenceFlags << 14) | packetSequenceCountOrPacketName;
+  }
+
+  private int buildPacketDataLength() {
+    // C (16 bits) => 2^16 - 1 = 65535
+    return this.packetDataLength & 65535;
+  }
+
+  // (highByte * 2^8 + lowByte) => [0, 100] => 0 * 2^8 + 100 = 100
+  private int read16BitBigEndianFormat(byte[] bytes, int offSet) {
+    int highByte = Byte.toUnsignedInt(bytes[offSet]);
+    int lowByte = Byte.toUnsignedInt(bytes[offSet + 1]);
+    return (highByte << 8) | lowByte;
+  }
+
+  // 255 in binary = 11111111
+  // value >>> 8 => value / 2^8 => 2^8 = (256)
+  private void write16BitBigEndianFormat(byte[] bytes, int offSet, int value) {
+    bytes[offSet] = (byte) ((value >>> 8) & 255); // High byte
+    bytes[offSet + 1] = (byte) (value & 255); // Low byte
   }
 
   public void setPacketVersionNumber(int packetVersionNumber) {

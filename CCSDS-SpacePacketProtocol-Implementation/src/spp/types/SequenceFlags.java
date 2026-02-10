@@ -34,7 +34,7 @@ public enum SequenceFlags {
       case 3:
         return UNSEGMENTED;
       default:
-        throw new IllegalArgumentException("SequenceFlags value must be from range 0 to 3!");
+        throw new IllegalArgumentException("SequenceFlags value must be from range 0 to 3 inclusive!");
     }
   }
 }

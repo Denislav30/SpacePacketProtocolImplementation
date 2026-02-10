@@ -18,16 +18,18 @@ public class SppImplementation {
   private static final Logger LOGGER = Logger.getLogger(SppImplementation.class.getName());
 
   public static void main(String[] args) {
+    formatLogger();
 
     byte[] dataField = new byte[] { 1, 2, 3, 4, 5 };
     int c = dataField.length - 1;
 
     SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 100, SequenceFlags.UNSEGMENTED, 7, c);
+    byte[] packetPrimaryHeader = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
+    LOGGER.info("Packet primary header bytes: " + Arrays.toString(packetPrimaryHeader));
 
     SpacePacket packet = new SpacePacket(spacePacketHeader, dataField);
 
     PacketCodec packetCodec = new PacketCodec();
-    formatLogger();
 
     // encode demo
     byte[] encoded = packetCodec.encodePacket(packet);
