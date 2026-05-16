@@ -23,21 +23,6 @@ public enum SequenceFlags {
     return value;
   }
 
-  public static SequenceFlags getSequenceFlags(int value) {
-    switch (value) {
-      case 0:
-        return CONTINUATION;
-      case 1:
-        return FIRST;
-      case 2:
-        return LAST;
-      case 3:
-        return UNSEGMENTED;
-      default:
-        throw new IllegalArgumentException("SequenceFlags value must be from range 0 to 3 inclusive!");
-    }
-  }
-
   public static SequenceFlags fromValue(int value) {
     for (SequenceFlags flag : SequenceFlags.values()) {
       if (flag.getValue() == value) {

@@ -1,10 +1,14 @@
 package ccsds.space.packet.protocol.codec;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import ccsds.space.packet.protocol.core.SpacePacket;
 import ccsds.space.packet.protocol.core.SpacePacketHeader;
 import ccsds.space.packet.protocol.types.CommandType;
+import ccsds.space.packet.protocol.types.SequenceFieldType;
 import ccsds.space.packet.protocol.types.SequenceFlags;
 import org.junit.jupiter.api.Test;
 
@@ -15,7 +19,9 @@ class PacketCodecTest {
     byte[] dataField = {1, 2, 3, 4, 5};
     int c = dataField.length - 1;
 
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 100, SequenceFlags.UNSEGMENTED, 7, c);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 100, SequenceFlags.UNSEGMENTED, 7,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, c);
     SpacePacket spacePacket = new SpacePacket(spacePacketHeader, dataField);
     PacketCodec packetCodec = new PacketCodec();
     byte[] encoded = packetCodec.encodePacket(spacePacket);
@@ -28,7 +34,9 @@ class PacketCodecTest {
     byte[] dataField = {1, 2, 3, 4, 5};
     int c = dataField.length - 1;
 
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 100, SequenceFlags.UNSEGMENTED, 7, c);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 100, SequenceFlags.UNSEGMENTED, 7,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, c);
     SpacePacket spacePacket = new SpacePacket(spacePacketHeader, dataField);
     PacketCodec packetCodec = new PacketCodec();
 
@@ -40,7 +48,7 @@ class PacketCodecTest {
     assertFalse(decoded.getHeader().isSecondaryHeaderFlag());
     assertEquals(100, decoded.getHeader().getApid());
     assertEquals(SequenceFlags.UNSEGMENTED, decoded.getHeader().getSequenceFlags());
-    assertEquals(7, decoded.getHeader().getPacketSequenceCount());
+    assertEquals(7, decoded.getHeader().getSequenceFieldValue());
     assertEquals(c, decoded.getHeader().getPacketDataLength());
     assertArrayEquals(dataField, decoded.getPacketDataField());
   }

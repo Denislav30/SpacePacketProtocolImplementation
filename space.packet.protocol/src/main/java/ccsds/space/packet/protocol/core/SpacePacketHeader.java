@@ -1,6 +1,7 @@
 package ccsds.space.packet.protocol.core;
 
 import ccsds.space.packet.protocol.types.CommandType;
+import ccsds.space.packet.protocol.types.SequenceFieldType;
 import ccsds.space.packet.protocol.types.SequenceFlags;
 
 /*
@@ -33,8 +34,8 @@ public class SpacePacketHeader {
   private static final int APID_IDLE_PACKET_11111111111 = 2047;
 
   // Sequence Count
-  private static final int PACKET_SEQUENCE_COUNT_MIN = 0;
-  private static final int PACKET_SEQUENCE_COUNT_MAX = 16383;
+  private static final int SEQUENCE_FIELD_VALUE_MIN = 0;
+  private static final int SEQUENCE_FIELD_VALUE_MAX = 16383;
 
   // Packet data length
   private static final int PACKET_DATA_LENGTH_MIN = 0;
@@ -49,18 +50,21 @@ public class SpacePacketHeader {
 
   // packet sequence control
   private SequenceFlags sequenceFlags;
-  private int packetSequenceCount;
+  private int sequenceFieldValue;
+  private SequenceFieldType sequenceFieldType;
 
   // packet length
   private int packetDataLength;
 
-  public SpacePacketHeader(int packetVersionNumber, CommandType packetType, boolean secondaryHeaderFlag,  int apid, SequenceFlags sequenceFlags, int packetSequenceCount, int packetDataLength) {
+  public SpacePacketHeader(int packetVersionNumber, CommandType packetType, boolean secondaryHeaderFlag, int apid,
+      SequenceFlags sequenceFlags, int sequenceFieldValue, SequenceFieldType sequenceFieldType, int packetDataLength) {
     this.packetVersionNumber = packetVersionNumber;
     this.packetType = packetType;
     this.secondaryHeaderFlag = secondaryHeaderFlag;
     this.apid = apid;
     this.sequenceFlags = sequenceFlags;
-    this.packetSequenceCount = packetSequenceCount;
+    this.sequenceFieldValue = sequenceFieldValue;
+    this.sequenceFieldType = sequenceFieldType;
     this.packetDataLength = packetDataLength;
   }
 
@@ -86,8 +90,16 @@ public class SpacePacketHeader {
     }
 
     // Sequence count
-    if (packetSequenceCount < PACKET_SEQUENCE_COUNT_MIN || packetSequenceCount > PACKET_SEQUENCE_COUNT_MAX) {
-      throw new IllegalArgumentException("Sequence count must be between 0 and 16383!");
+    if (sequenceFieldValue < SEQUENCE_FIELD_VALUE_MIN || sequenceFieldValue > SEQUENCE_FIELD_VALUE_MAX) {
+      throw new IllegalArgumentException("Sequence field value must be between 0 and 16383!");
+    }
+
+    if (sequenceFieldType == null) {
+      throw new IllegalArgumentException("Sequence field type cannot be null!");
+    }
+
+    if (packetType == CommandType.TM && sequenceFieldType != SequenceFieldType.PACKET_SEQUENCE_COUNT) {
+      throw new IllegalArgumentException("Telemetry packet must use PACKET_SEQUENCE_COUNT!");
     }
 
     // Packet Length
@@ -104,7 +116,7 @@ public class SpacePacketHeader {
     if (packetDataFieldOctets < 1) {
       throw new IllegalArgumentException("packetDataFieldOctets must be at least 1 octet!");
     }
-    return  packetDataFieldOctets - 1;
+    return packetDataFieldOctets - 1;
   }
 
   public byte[] convertToPacketPrimaryHeaderBytes() {
@@ -124,6 +136,11 @@ public class SpacePacketHeader {
   }
 
   public static SpacePacketHeader parsePacketPrimaryHeader(byte[] packetPrimaryHeader) {
+    return parsePacketPrimaryHeader(packetPrimaryHeader, SequenceFieldType.PACKET_SEQUENCE_COUNT);
+  }
+
+  public static SpacePacketHeader parsePacketPrimaryHeader(byte[] packetPrimaryHeader,
+      SequenceFieldType tcSequenceFieldType) {
     if (packetPrimaryHeader == null) {
       throw new IllegalArgumentException("Packet primary header cannot be null!");
     }
@@ -131,18 +148,30 @@ public class SpacePacketHeader {
       throw new IllegalArgumentException("Packet primary header length must be exactly 6 bytes!");
     }
 
+    if (tcSequenceFieldType == null) {
+      throw new IllegalArgumentException("tcSequenceFieldType cannot be null!");
+    }
+
     int packetIdentification = read16BitBigEndianFormat(packetPrimaryHeader, 0);
     int packetSequenceControl = read16BitBigEndianFormat(packetPrimaryHeader, 2);
     int c = read16BitBigEndianFormat(packetPrimaryHeader, 4);
 
     // temporary header
-    SpacePacketHeader temporaryHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 0);
+    SpacePacketHeader temporaryHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 0);
 
     temporaryHeader.parsePacketIdentification(packetIdentification);
     temporaryHeader.parsePacketSequenceControl(packetSequenceControl);
     temporaryHeader.parsePacketDataLength(c);
-    temporaryHeader.validateHeaderFields();
 
+    if (temporaryHeader.packetType == CommandType.TM) {
+      temporaryHeader.sequenceFieldType = SequenceFieldType.PACKET_SEQUENCE_COUNT;
+    } else {
+      temporaryHeader.sequenceFieldType = tcSequenceFieldType;
+    }
+
+    temporaryHeader.validateHeaderFields();
     return temporaryHeader;
   }
 
@@ -159,7 +188,8 @@ public class SpacePacketHeader {
     // (11 bits) => 2^11 - 1 = 2047
     int apid = this.apid & 2047;
 
-    // packetVersionNumber is before (packetType(1) + secondary header flag(1) + application process identifier(11)) => packetVersionNumber << 13
+    // packetVersionNumber is before (packetType(1) + secondary header flag(1) + application process identifier(11))
+    // => packetVersionNumber << 13
     // packetType is before (secondaryHeaderFlag(1) + application process identifier(11)) => packetType << 12
     // secondaryHeaderFlag is before (apid(11)) => secondaryHeaderFlag << 11
     // apid should not be moved
@@ -178,7 +208,7 @@ public class SpacePacketHeader {
 
     // secondary header flag is at position 11 => shift down by 11
     // (1 bit) => (2^1 - 1) = 1
-    int secondaryHeaderFlagBit  = (word >>> 11) & 1;
+    int secondaryHeaderFlagBit = (word >>> 11) & 1;
     this.secondaryHeaderFlag = (secondaryHeaderFlagBit == 1);
 
     // APID is the lower 11 bits => no shift needed
@@ -191,10 +221,11 @@ public class SpacePacketHeader {
     int sequenceFlags = this.sequenceFlags.getValue() & 3;
 
     // (14 bits) => 2^14 - 1 = 16383
-    int packetSequenceCountOrPacketName = this.packetSequenceCount & 16383;
+    int sequenceFieldValue = this.sequenceFieldValue & 16383;
 
-    // sequence flags is before (packetSequenceCountOrPacketName(14)) => packetSequenceCountOrPacketName << 14
-    return (sequenceFlags << 14) | packetSequenceCountOrPacketName;
+    // sequenceFlags occupy the upper 2 bits -> they are shifted left by 14 positions
+    // sequenceFieldValue occupies the lower 14 bits
+    return (sequenceFlags << 14) | sequenceFieldValue;
   }
 
   private void parsePacketSequenceControl(int word) {
@@ -205,7 +236,7 @@ public class SpacePacketHeader {
 
     // packet sequence count is lower 14 bits => no shift needed
     // (14 bits) => 2^14 - 1 = 16383
-    this.packetSequenceCount = word & 16383;
+    this.sequenceFieldValue = word & 16383;
   }
 
   private int buildPacketDataLength() {
@@ -253,8 +284,12 @@ public class SpacePacketHeader {
     this.sequenceFlags = sequenceFlags;
   }
 
-  public void setPacketSequenceCount(int packetSequenceCount) {
-    this.packetSequenceCount = packetSequenceCount;
+  public void setSequenceFieldValue(int sequenceFieldValue) {
+    this.sequenceFieldValue = sequenceFieldValue;
+  }
+
+  public void setSequenceFieldType(SequenceFieldType sequenceFieldType) {
+    this.sequenceFieldType = sequenceFieldType;
   }
 
   public void setPacketDataLength(int packetDataLength) {
@@ -281,8 +316,12 @@ public class SpacePacketHeader {
     return sequenceFlags;
   }
 
-  public int getPacketSequenceCount() {
-    return packetSequenceCount;
+  public int getSequenceFieldValue() {
+    return sequenceFieldValue;
+  }
+
+  public SequenceFieldType getSequenceFieldType() {
+    return sequenceFieldType;
   }
 
   public int getPacketDataLength() {

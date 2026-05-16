@@ -17,7 +17,7 @@ public class PacketServiceProvider implements PacketService{
     this.octetStringService.setOctetStringListener(octetStringIndication -> {
       SpacePacket spacePacket = packetCodec.decodePacket(octetStringIndication.octetString());
       if (packetListener != null) {
-        packetListener.indication(new PacketIndication(spacePacket, spacePacket.getHeader().getApid(), null));
+        packetListener.indication(new PacketIndication(spacePacket, null));
       }
     });
   }
@@ -27,12 +27,11 @@ public class PacketServiceProvider implements PacketService{
     SpacePacket spacePacket = packetRequest.spacePacket();
     byte[] bytes = packetCodec.encodePacket(spacePacket);
 
-    octetStringService.request(new OctetStringRequest(
-        bytes,
-        packetRequest.apid(),
+    octetStringService.request(new OctetStringRequest(bytes,
+        spacePacket.getHeader().getApid(),
         spacePacket.getHeader().isSecondaryHeaderFlag(),
         spacePacket.getHeader().getPacketType(),
-        spacePacket.getHeader().getPacketSequenceCount()
+        spacePacket.getHeader().getSequenceFieldValue()
     ));
   }
 

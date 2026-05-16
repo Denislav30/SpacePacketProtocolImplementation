@@ -1,8 +1,12 @@
 package ccsds.space.packet.protocol.core;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ccsds.space.packet.protocol.types.CommandType;
+import ccsds.space.packet.protocol.types.SequenceFieldType;
 import ccsds.space.packet.protocol.types.SequenceFlags;
 import org.junit.jupiter.api.Test;
 
@@ -10,14 +14,20 @@ class SpacePacketHeaderTest {
 
   @Test
   void convertToPacketPrimaryHeaderBytes_shouldReturnSixBytes_spacePacketHeaderGiven() {
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 100, SequenceFlags.UNSEGMENTED, 7, 4);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 100, SequenceFlags.UNSEGMENTED, 7,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 4);
+
     byte[] bytes = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
     assertEquals(6, bytes.length);
   }
 
   @Test
   void parsePacketPrimaryHeader_shouldPreserveAllFields_encodedSpacePacketHeaderGiven() {
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TC, true, 10, SequenceFlags.FIRST, 123, 0);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TC,
+        true, 10, SequenceFlags.FIRST, 123,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT,0);
+
     byte[] bytes = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
     SpacePacketHeader parsedSpacePacketHeader = SpacePacketHeader.parsePacketPrimaryHeader(bytes);
 
@@ -26,47 +36,75 @@ class SpacePacketHeaderTest {
     assertTrue(parsedSpacePacketHeader.isSecondaryHeaderFlag());
     assertEquals(10, parsedSpacePacketHeader.getApid());
     assertEquals(SequenceFlags.FIRST, parsedSpacePacketHeader.getSequenceFlags());
-    assertEquals(123, parsedSpacePacketHeader.getPacketSequenceCount());
+    assertEquals(123, parsedSpacePacketHeader.getSequenceFieldValue());
     assertEquals(0, parsedSpacePacketHeader.getPacketDataLength());
   }
 
   @Test
+  void parsePacketPrimaryHeader_shouldUsePacketNameForTelecommand_whenSpecified() {
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TC,
+        true, 10, SequenceFlags.FIRST, 123,
+        SequenceFieldType.PACKET_NAME, 0);
+
+    byte[] bytes = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
+
+    SpacePacketHeader parsedPacketPrimaryHeader = SpacePacketHeader.parsePacketPrimaryHeader(bytes,
+        SequenceFieldType.PACKET_NAME);
+
+    assertEquals(CommandType.TC, parsedPacketPrimaryHeader.getPacketType());
+    assertEquals(123, parsedPacketPrimaryHeader.getSequenceFieldValue());
+    assertEquals(SequenceFieldType.PACKET_NAME, parsedPacketPrimaryHeader.getSequenceFieldType());
+  }
+
+  @Test
   void validateHeaderFields_shouldThrowIllegalArgumentException_invalidPacketVersionNumberGiven() {
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(1, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 0);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(1, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 0);
     assertThrows(IllegalArgumentException.class, spacePacketHeader::validateHeaderFields);
   }
 
   @Test
   void validateHeaderFields_shouldThrowIllegalArgumentException_invalidApidGiven() {
     // 3000 > 2047
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 3000, SequenceFlags.UNSEGMENTED, 0, 0);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 3000, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 0);
     assertThrows(IllegalArgumentException.class, spacePacketHeader::validateHeaderFields);
   }
 
   @Test
   void validateHeaderFields_shouldThrowIllegalArgumentException_invalidPacketSequenceCountGiven() {
     // 20000 > 16383
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 20000, 0);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 20000,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 0);
     assertThrows(IllegalArgumentException.class, spacePacketHeader::validateHeaderFields);
   }
 
   @Test
   void validateHeaderFields_shouldThrowIllegalArgumentException_invalidCGiven() {
     // 70000 > 65535
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 70000);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 70000);
     assertThrows(IllegalArgumentException.class, spacePacketHeader::validateHeaderFields);
   }
 
   @Test
   void getPacketDataFieldOctets_shouldReturnFive_spacePacketHeaderGiven() {
     // 4 + 1
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 4);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 4);
     assertEquals(5, spacePacketHeader.getPacketDataFieldOctets());
   }
 
   @Test
   void convertToPacketPrimaryHeaderBytes_shouldReturnCorrectData_spacePacketHeaderGiven() {
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 100, SequenceFlags.UNSEGMENTED, 7, 4);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 100, SequenceFlags.UNSEGMENTED, 7,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 4);
 
     byte[] headerBytes = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
 
@@ -88,7 +126,9 @@ class SpacePacketHeaderTest {
 
   @Test
   void convertToPacketPrimaryHeaderBytes_shouldWriteCInBigEndian_spacePacketHeaderGiven() {
-    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM, false, 0, SequenceFlags.UNSEGMENTED, 0, 4);
+    SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
+        false, 0, SequenceFlags.UNSEGMENTED, 0,
+        SequenceFieldType.PACKET_SEQUENCE_COUNT, 4);
 
     byte[] bytes = spacePacketHeader.convertToPacketPrimaryHeaderBytes();
 
