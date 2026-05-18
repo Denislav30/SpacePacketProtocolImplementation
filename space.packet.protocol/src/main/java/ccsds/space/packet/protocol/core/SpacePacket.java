@@ -8,11 +8,13 @@ SpacePacket
 public class SpacePacket {
 
   private SpacePacketHeader header;
-  private byte[] packetDataField;
+  private byte[] packetSecondaryHeader;
+  private byte[] userDataField;
 
-  public SpacePacket(SpacePacketHeader header, byte[] packetDataField) {
+  public SpacePacket(SpacePacketHeader header, byte[] packetSecondaryHeader, byte[] userDataField) {
     this.header = header;
-    this.packetDataField = packetDataField;
+    this.packetSecondaryHeader = packetSecondaryHeader == null ? new byte[0] : packetSecondaryHeader;
+    this.userDataField = userDataField == null ? new byte[0] : userDataField;
   }
 
   public void validateSpacePacket() {
@@ -22,30 +24,59 @@ public class SpacePacket {
 
     header.validateHeaderFields();
 
-    if (packetDataField == null) {
-      throw new IllegalArgumentException("Packet Data Field cannot be null!");
+    if (packetSecondaryHeader == null) {
+      throw new IllegalArgumentException("Packet secondary header cannot be null!");
     }
 
-    // Packet data field length (octets) must be C + 1
-    int expected = header.getPacketDataFieldOctets();
-    if (packetDataField.length != expected) {
-      throw new IllegalArgumentException("Packet Data Field length must be exactly C + 1");
+    if (userDataField == null) {
+      throw new IllegalArgumentException("User data field cannot be null!");
     }
+
+    if (header.isSecondaryHeaderFlag() && packetSecondaryHeader.length == 0) {
+      throw new IllegalArgumentException("Secondary header flag is true, but packet secondary header is empty!");
+    }
+
+    if (!header.isSecondaryHeaderFlag() && packetSecondaryHeader.length > 0) {
+      throw new IllegalArgumentException("Secondary header flag is false, but packet secondary header is present!");
+    }
+
+    if (!header.isSecondaryHeaderFlag() && userDataField.length == 0) {
+      throw new IllegalArgumentException("User data field is mandatory when secondary header is not present!");
+    }
+
+    if (getPacketDataField().length != header.getPacketDataFieldOctets()) {
+      throw new IllegalArgumentException("Packet Data Field length must match packetDataLength + 1!");
+    }
+  }
+
+  public byte[] getPacketDataField() {
+    byte[] result = new byte[packetSecondaryHeader.length + userDataField.length];
+    System.arraycopy(packetSecondaryHeader, 0, result, 0, packetSecondaryHeader.length);
+    System.arraycopy(userDataField, 0, result, packetSecondaryHeader.length, userDataField.length);
+    return result;
   }
 
   public SpacePacketHeader getHeader() {
     return header;
   }
 
-  public byte[] getPacketDataField() {
-    return packetDataField;
+  public byte[] getPacketSecondaryHeader() {
+    return packetSecondaryHeader;
+  }
+
+  public byte[] getUserDataField() {
+    return userDataField;
   }
 
   public void setHeader(SpacePacketHeader header) {
     this.header = header;
   }
 
-  public void setPacketDataField(byte[] packetDataField) {
-    this.packetDataField = packetDataField;
+  public void setPacketSecondaryHeader(byte[] packetSecondaryHeader) {
+    this.packetSecondaryHeader = packetSecondaryHeader;
+  }
+
+  public void setUserDataField(byte[] userDataField) {
+    this.userDataField = userDataField;
   }
 }

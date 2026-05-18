@@ -25,8 +25,9 @@ public class SppImplementation {
   public static void main(String[] args) {
     formatLogger();
 
-    byte[] dataField = new byte[]{1, 2, 3, 4, 5};
-    int c = dataField.length - 1;
+    byte[] packetSecondaryHeader = new byte[0];
+    byte[] userDataField = new byte[]{1, 2, 3, 4, 5};
+    int c = (packetSecondaryHeader.length + userDataField.length) - 1;
 
     SpacePacketHeader spacePacketHeader = new SpacePacketHeader(0, CommandType.TM,
         false, 100, SequenceFlags.UNSEGMENTED, 7,
@@ -36,15 +37,15 @@ public class SppImplementation {
     SpacePacketHeader parsedPacketPrimaryHeader = SpacePacketHeader.parsePacketPrimaryHeader(primaryHeaderBytes);
 
     LOGGER.info("Primary Header bytes (6): " + Arrays.toString(primaryHeaderBytes));
-    LOGGER.info(
-        "Original APID = " + spacePacketHeader.getApid() + ", Parsed APID = " + parsedPacketPrimaryHeader.getApid());
-    LOGGER.info("Original SequenceCount = " + spacePacketHeader.getSequenceFieldValue() + ", Parsed SequenceCount = "
-        + parsedPacketPrimaryHeader.getSequenceFieldValue());
-    LOGGER.info("Original C = " + spacePacketHeader.getPacketDataLength() + ", Parsed C = "
-        + parsedPacketPrimaryHeader.getPacketDataLength());
+    LOGGER.info("Original APID = " + spacePacketHeader.getApid() + ", Parsed APID = "
+        + parsedPacketPrimaryHeader.getApid());
+    LOGGER.info("Original SequenceCount = " + spacePacketHeader.getSequenceFieldValue()
+        + ", Parsed SequenceCount = " + parsedPacketPrimaryHeader.getSequenceFieldValue());
+    LOGGER.info("Original C = " + spacePacketHeader.getPacketDataLength()
+        + ", Parsed C = " + parsedPacketPrimaryHeader.getPacketDataLength());
 
     // PacketService demo
-    SpacePacket spacePacket = new SpacePacket(spacePacketHeader, dataField);
+    SpacePacket spacePacket = new SpacePacket(spacePacketHeader, packetSecondaryHeader, userDataField);
     PacketCodec packetCodec = new PacketCodec();
 
     OctetStringChannel channel = new OctetStringChannel();
@@ -61,7 +62,9 @@ public class SppImplementation {
       LOGGER.info("  sequenceFlags = " + packet.getHeader().getSequenceFlags());
       LOGGER.info("  sequenceCount = " + packet.getHeader().getSequenceFieldValue());
       LOGGER.info("  C(packetDataLength) = " + packet.getHeader().getPacketDataLength());
-      LOGGER.info("  dataField = " + Arrays.toString(packet.getPacketDataField()));
+      LOGGER.info("  packetSecondaryHeader = " + Arrays.toString(packet.getPacketSecondaryHeader()));
+      LOGGER.info("  userDataField = " + Arrays.toString(packet.getUserDataField()));
+      LOGGER.info("  packetDataField = " + Arrays.toString(packet.getPacketDataField()));
     });
 
     packetServiceProvider.request(new PacketRequest(spacePacket, null));

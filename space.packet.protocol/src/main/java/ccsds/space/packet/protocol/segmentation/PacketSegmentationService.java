@@ -12,22 +12,23 @@ import java.util.List;
 
 public class PacketSegmentationService {
 
-  public List<SpacePacket> segmentPacket(SpacePacket originalPacket, int maxPacketDataFieldPerSegment) {
+  public List<SpacePacket> segmentPacket(SpacePacket originalPacket, int maxUserDataFieldPerSegment) {
     if (originalPacket == null) {
       throw new IllegalArgumentException("Original packet cannot be null!");
     }
-    if (maxPacketDataFieldPerSegment <= 0) {
-      throw new IllegalArgumentException("MaxPacketDataFieldPerSegment must be > 0!");
+    if (maxUserDataFieldPerSegment <= 0) {
+      throw new IllegalArgumentException("MaxUserDataFieldPerSegment must be > 0!");
     }
 
     originalPacket.validateSpacePacket();
 
     SpacePacketHeader originalHeader = originalPacket.getHeader();
-    byte[] fullPacketDataField = originalPacket.getPacketDataField();
+    byte[] packetSecondaryHeader = originalPacket.getPacketSecondaryHeader();
+    byte[] fullUserDataField = originalPacket.getUserDataField();
 
     List<SpacePacket> result = new ArrayList<>();
 
-    if (fullPacketDataField.length <= maxPacketDataFieldPerSegment) {
+    if (fullUserDataField.length <= maxUserDataFieldPerSegment) {
       SpacePacketHeader singleHeader = new SpacePacketHeader(
           originalHeader.getPacketVersionNumber(),
           originalHeader.getPacketType(),
@@ -36,10 +37,10 @@ public class PacketSegmentationService {
           SequenceFlags.UNSEGMENTED,
           originalHeader.getSequenceFieldValue(),
           originalHeader.getSequenceFieldType(),
-          SpacePacketHeader.getPacketLengthFromOctets(fullPacketDataField.length)
-      );
+          SpacePacketHeader.getPacketLengthFromOctets(packetSecondaryHeader.length
+              + fullUserDataField.length));
 
-      result.add(new SpacePacket(singleHeader, fullPacketDataField));
+      result.add(new SpacePacket(singleHeader, packetSecondaryHeader, fullUserDataField));
       return result;
     }
 
@@ -47,16 +48,16 @@ public class PacketSegmentationService {
     int index = 0;
     int startSequenceCount = originalHeader.getSequenceFieldValue();
 
-    while (offset < fullPacketDataField.length) {
-      int remaining = fullPacketDataField.length - offset;
-      int currentLength = Math.min(maxPacketDataFieldPerSegment, remaining);
+    while (offset < fullUserDataField.length) {
+      int remaining = fullUserDataField.length - offset;
+      int currentLength = Math.min(maxUserDataFieldPerSegment, remaining);
 
-      byte[] chunk = Arrays.copyOfRange(fullPacketDataField, offset, offset + currentLength);
+      byte[] chunk = Arrays.copyOfRange(fullUserDataField, offset, offset + currentLength);
 
       SequenceFlags sequenceFlags;
       if (offset == 0) {
         sequenceFlags = SequenceFlags.FIRST;
-      } else if (offset + currentLength >= fullPacketDataField.length) {
+      } else if (offset + currentLength >= fullUserDataField.length) {
         sequenceFlags = SequenceFlags.LAST;
       } else {
         sequenceFlags = SequenceFlags.CONTINUATION;
@@ -64,22 +65,27 @@ public class PacketSegmentationService {
 
       int segmentSequenceCount = (startSequenceCount + index) & 16383;
 
-      SpacePacketHeader segmentHeader = new SpacePacketHeader(
-          originalHeader.getPacketVersionNumber(),
-          originalHeader.getPacketType(),
-          originalHeader.isSecondaryHeaderFlag(),
-          originalHeader.getApid(),
-          sequenceFlags,
-          segmentSequenceCount,
-          originalHeader.getSequenceFieldType(),
-          SpacePacketHeader.getPacketLengthFromOctets(chunk.length)
-      );
+      byte[] currentPacketSecondaryHeader;
+      boolean currentSecondaryHeaderFlag;
 
-      result.add(new SpacePacket(segmentHeader, chunk));
+      if (offset == 0) {
+        currentPacketSecondaryHeader = packetSecondaryHeader;
+        currentSecondaryHeaderFlag = originalHeader.isSecondaryHeaderFlag();
+      } else {
+        currentPacketSecondaryHeader = new byte[0];
+        currentSecondaryHeaderFlag = false;
+      }
+
+      SpacePacketHeader segmentHeader = new SpacePacketHeader(originalHeader.getPacketVersionNumber(),
+          originalHeader.getPacketType(), currentSecondaryHeaderFlag, originalHeader.getApid(),
+          sequenceFlags, segmentSequenceCount, originalHeader.getSequenceFieldType(),
+          SpacePacketHeader.getPacketLengthFromOctets(currentPacketSecondaryHeader.length
+              + chunk.length));
+
+      result.add(new SpacePacket(segmentHeader, currentPacketSecondaryHeader, chunk));
       offset += currentLength;
       index++;
     }
-
     return result;
   }
 
@@ -95,7 +101,6 @@ public class PacketSegmentationService {
       if (onlyPacket.getHeader().getSequenceFlags() != SequenceFlags.UNSEGMENTED) {
         throw new IllegalArgumentException("Single segment must use UNSEGMENTED flag!");
       }
-
       return onlyPacket;
     }
 
@@ -118,9 +123,9 @@ public class PacketSegmentationService {
     int packetVersionNumber = firstHeader.getPacketVersionNumber();
     CommandType packetType = firstHeader.getPacketType();
     SequenceFieldType sequenceFieldType = firstHeader.getSequenceFieldType();
-    boolean secondaryHeaderFlag = firstHeader.isSecondaryHeaderFlag();
     int expectedSequenceValue = firstHeader.getSequenceFieldValue();
 
+    byte[] packetSecondaryHeader = firstPacket.getPacketSecondaryHeader();
     ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
 
     for (int i = 0; i < segments.size(); i++) {
@@ -163,16 +168,18 @@ public class PacketSegmentationService {
           throw new IllegalArgumentException("Middle segments must have CONTINUATION flag!");
         }
       }
-      byteArrayOutputStream.writeBytes(currentPacket.getPacketDataField());
+      byteArrayOutputStream.writeBytes(currentPacket.getUserDataField());
       expectedSequenceValue = (expectedSequenceValue + 1) & 16383;
     }
 
-    byte[] fullPacketDataField = byteArrayOutputStream.toByteArray();
+    byte[] fullUserDataField = byteArrayOutputStream.toByteArray();
 
-    SpacePacketHeader reassembledHeader = new SpacePacketHeader(packetVersionNumber, packetType, secondaryHeaderFlag,
-        apid, SequenceFlags.UNSEGMENTED, firstHeader.getSequenceFieldValue(), sequenceFieldType,
-        SpacePacketHeader.getPacketLengthFromOctets(fullPacketDataField.length));
+    SpacePacketHeader reassembledHeader = new SpacePacketHeader(packetVersionNumber, packetType,
+        packetSecondaryHeader.length > 0, apid, SequenceFlags.UNSEGMENTED,
+        firstHeader.getSequenceFieldValue(), sequenceFieldType,
+        SpacePacketHeader.getPacketLengthFromOctets(packetSecondaryHeader.length
+            + fullUserDataField.length));
 
-    return new SpacePacket(reassembledHeader, fullPacketDataField);
+    return new SpacePacket(reassembledHeader, packetSecondaryHeader, fullUserDataField);
   }
 }
