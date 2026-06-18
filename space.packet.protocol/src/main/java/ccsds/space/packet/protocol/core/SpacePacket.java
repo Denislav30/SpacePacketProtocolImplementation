@@ -13,8 +13,8 @@ public class SpacePacket {
 
   public SpacePacket(SpacePacketHeader header, byte[] packetSecondaryHeader, byte[] userDataField) {
     this.header = header;
-    this.packetSecondaryHeader = packetSecondaryHeader == null ? new byte[0] : packetSecondaryHeader;
-    this.userDataField = userDataField == null ? new byte[0] : userDataField;
+    this.packetSecondaryHeader = packetSecondaryHeader;
+    this.userDataField = userDataField;
   }
 
   public void validateSpacePacket() {
